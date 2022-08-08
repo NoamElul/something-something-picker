@@ -1,7 +1,7 @@
 import './App.css';
 import React, { useRef, useState } from 'react';
-import VideoClip from './VideoClip';
 import VideoContainer from './VideoContainer';
+import mediaInfo from './data/media_info.json';
 
 function App() {
   const dataObjRef = useRef({});
@@ -24,28 +24,25 @@ function App() {
   }
 
   return (
-    <div>
+    <div id="app">
       <VideoContainer
-        videoURL={videoURL}
         videoID={videoID}
+        videoURL={videoURL}
+        videoFPS={mediaInfo[String(videoID)].frame_rate}
+        aspectRatio={mediaInfo[String(videoID)].width / mediaInfo[String(videoID)].height}
         dataObj={dataObjRef.current}
       />
-          <button className="btn" type="button" onClick={handleSubmit}>
-            Submit
-          </button>
+      <button
+        className="btn"
+        type="button"
+        onClick={handleSubmit}
+        id={`button${videoID}`}
+        key={`button${videoID}`}
+      >
+        Submit
+      </button>
     </div>
   );
-
-  /*
-  return (
-    <VideoClip
-      videoURL="something_something/1.webm"
-      startSecs={1.0}
-      endSecs={1.5}
-      dataObj={globalDataObj}
-    />
-  );
-*/
 }
 
 export default App;
