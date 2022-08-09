@@ -1,6 +1,6 @@
 .vscode/
 
-/public/something_something
+# /public/something_something
 
 # dependencies
 /node_modules
