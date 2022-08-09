@@ -1,46 +1,82 @@
 div#video-container {
+  max-width: 100vw;
+  max-height: 100vh;
+  min-height: 0;
   display: flex;
-  flex: 1 1 100%;
+  flex: 0 1 100%;
   flex-direction: column;
+  align-items: center;
 }
 
 video#main-video {
-  align-self: center;
   flex: 1 0 80%;
   object-fit: contain;
 }
 
-div#frames-container-container {
+div#progress-bar-outer {
   position: relative;
-  flex: 0 0 15%;
-  align-content: center;
+  flex: 0 0 1.3%;
+  width: 100%;
+  background-color: dimgray;
 }
 
-div.frames-container {
+div#progress-bar {
+  height: 100%;
   position: absolute;
+  left: 0;
+  top: 0;
+  background-color: black;
+  pointer-events: none;
+}
+
+div.marker-container {
+  height: 100%;
+  position: absolute;
+  top: 0;
+  aspect-ratio: 0.5;
+  pointer-events: none;
+  color: white;
+  overflow: visible;
+}
+
+svg.marker {
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0%;
+  left: 0%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+div#controls-container {
+  flex: 0 0 7%;
+  overflow: hidden;
+  background-color: silver;
   display: flex;
-  height: 100%;
-  width: 100%;
-  align-items: stretch;
+  align-items: center;
+  justify-content: center;
+  column-gap: 5px;
 }
 
-div.frame-container {
-  background-color: lightgray;
-  flex: 1 1 20%;
+div.button-container {
+  height: 100%;
+  aspect-ratio: 1.0;
+  position: relative;
+  background-color: rgba(169, 169, 169, 0.4);
 }
 
-video.frame {
-  width: 100%;
+svg.button {
   height: 100%;
-  object-fit: contain;
+  width: 100%;
 }
 
 div.rectangle {
   position: absolute;
-  pointer-events: none;
   outline-width: thin;
   outline-style: solid;
   text-align: center;
+  pointer-events: none;
 }
 
 span.rectText {
@@ -50,6 +86,24 @@ span.rectText {
   left: 50%;
   transform: translate(-50%, -50%);
   text-transform: capitalize;
+}
+
+div.x-button-container {
+  position: absolute;
+  top: 0%;
+  left: 0%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+}
+
+svg.x-button {
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0%;
+  left: 0%;
+  pointer-events: fill;
 }
 
 span.dot {

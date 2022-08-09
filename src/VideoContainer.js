@@ -1,7 +1,6 @@
 /* eslint-disable max-len */
 import './VideoContainer.css';
-import React, { useRef, useState } from 'react';
-import ReactDOM from 'react-dom';
+import React, { useEffect, useRef, useState } from 'react';
 
 const colors = [
   [255, 0, 0], // Red
@@ -12,57 +11,53 @@ const colors = [
   [255, 255, 0], // Yellow
 ];
 
-const options = ['touch', 'release', 'slide', 'roll'];
+const options = ['touch', 'stop touching', 'slide'];
 
 function VideoContainer({ videoID, videoURL, videoFPS, dataObj }) {
   const videoRef = useRef(null);
   const [duration, setDuration] = useState(NaN);
-  const [currFrameReduced, setCurrFrameReduced] = useState(0);
-  const currFrameFullRef = useRef(0);
+  const [videoWidth, setVideoWidth] = useState(NaN);
+  const [currFrame, setCurrFrame] = useState(0);
+  const [currTime, setCurrTime] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const [_forceUpdate, setForceUpdate] = useState(false);
   const keydownHandlerRef = useRef(null);
 
   const [pointTimeOne, setPointTimeOne] = useState(false);
   const [pointTimeTwo, setPointTimeTwo] = useState(false);
 
-  const reducedFPS = 4; // Math.max(4, Math.floor(videoFPS / 3));
-  const lastFrameReduced = Math.floor(duration * reducedFPS);
-  // const lastFrameFull = Math.floor(duration * videoFPS);
-
-  function centerOfFrameReduced(n) {
-    return (n + 0.5) / reducedFPS;
+  if (videoRef?.current?.offsetWidth && (videoWidth !== videoRef.current.offsetWidth)) {
+    setVideoWidth(videoRef.current.offsetWidth);
   }
 
   function setTime(secs) {
     videoRef.current.currentTime = Math.max(Math.min(secs, duration || Infinity), 0);
   }
 
-  function setFrameReduced(n) {
-    setTime(centerOfFrameReduced(n));
-  }
-
-  function incrFrameReduced(n) {
-    setFrameReduced(currFrameReduced + n);
-    videoRef.current.pause();
-  }
-
-  function centerOfFrameFull(n) {
+  function centerOfFrame(n) {
     return (n + 0.5) / videoFPS;
   }
 
-  function setFrameFull(n) {
-    setTime(centerOfFrameFull(n));
+  function setFrame(n) {
+    setTime(centerOfFrame(n));
   }
 
-  function incrFrameFull(n) {
-    setFrameFull(currFrameFullRef.current + n);
+  function incrFrame(n) {
+    setFrame(currFrame + n);
     videoRef.current.pause();
   }
 
   function timeUpdate() {
-    currFrameFullRef.current = Math.floor(videoRef.current.currentTime * videoFPS);
-    setCurrFrameReduced(Math.floor(videoRef.current.currentTime * reducedFPS));
-    setForceUpdate((val) => !val);
+    setCurrFrame(Math.floor(videoRef.current.currentTime * videoFPS));
+    setCurrTime(videoRef.current.currentTime);
+  }
+
+  function pauseHandler() {
+    setIsPaused(true);
+  }
+
+  function playHandler() {
+    setIsPaused(false);
   }
 
   if (typeof dataObj[videoID] === 'undefined') {
@@ -71,40 +66,71 @@ function VideoContainer({ videoID, videoURL, videoFPS, dataObj }) {
 
   function handleReady(e) {
     setDuration(e.target.duration);
+    if (e.target.offsetWidth) {
+      setVideoWidth(e.target.offsetWidth);
+    }
+  }
+
+  function frameBack() {
+    incrFrame(-1);
+  }
+
+  function frameForward() {
+    incrFrame(1);
+  }
+
+  function skipBack() {
+    setTime(currTime - 0.5);
+  }
+
+  function skipForward() {
+    setTime(currTime + 0.5);
+  }
+
+  function playPause() {
+    if (isPaused) {
+      videoRef.current.play();
+    } else {
+      videoRef.current.pause();
+    }
+  }
+
+  function cancel() {
+    setPointTimeOne(false);
+    setPointTimeTwo(false);
   }
 
   function keydownHandler(e) {
     switch (e.key) {
       case ',':
-        incrFrameFull(-1);
+        frameBack();
         break;
       case '.':
-        incrFrameFull(1);
+        frameForward();
         break;
       case 'ArrowLeft':
-        setTime(videoRef.current.currentTime - 0.5);
+        skipBack();
         break;
       case 'ArrowRight':
-        setTime(videoRef.current.currentTime + 0.5);
+        skipForward();
         break;
       case ' ':
       case 'Spacebar':
-        if (videoRef.current.paused) {
-          videoRef.current.play();
-        } else {
-          videoRef.current.pause();
-        }
+        playPause();
         break;
       case 'Escape':
-        setPointTimeOne(false);
-        setPointTimeTwo(false);
+        cancel();
         break;
       default:
     }
   }
   keydownHandlerRef.current = keydownHandler;
 
-  document.addEventListener('keydown', (e) => (keydownHandlerRef.current(e)));
+  useEffect(() => {
+    const keyDown = (e) => keydownHandlerRef.current(e);
+    document.addEventListener('keydown', keyDown);
+    return () => document.removeEventListener('keydown', keyDown);
+  }, []);
 
   function onClickVideo(e) {
     e.preventDefault();
@@ -116,28 +142,24 @@ function VideoContainer({ videoID, videoURL, videoFPS, dataObj }) {
 
     const x = clientX / clientW;
     const y = clientY / clientH;
-    const time = e.target.currentTime;
-    const pointTime = { time, x, y };
+    const time = currTime;
+    const pointTimeNew = { time, x, y };
 
     if (!pointTimeOne) {
-      setPointTimeOne(pointTime);
+      setPointTimeOne(pointTimeNew);
     } else if (!pointTimeTwo) {
-      e.target.pause();
-      let newPointTimeOne = pointTimeOne;
-      let newPointTimeTwo = pointTime;
-      let diff = newPointTimeTwo.time - newPointTimeOne.time;
-      if (diff < 0) {
-        const temp = newPointTimeOne;
-        newPointTimeOne = newPointTimeTwo;
-        newPointTimeTwo = temp;
-        diff = -diff;
-      }
+      let diff = pointTimeNew.time - pointTimeOne.time; // Positive if pointTimeOne is earlier
+      const sign = Math.sign(diff) || 1; // If diff is zero, treat as positive
+      diff = Math.abs(diff);
       if (diff < 0.25) {
-        newPointTimeOne.time -= (0.25 - diff) / 2;
-        newPointTimeTwo.time += (0.25 - diff) / 2;
+        pointTimeOne.time -= sign * ((0.25 - diff) / 2);
+        pointTimeNew.time += sign * ((0.25 - diff) / 2);
       }
-      setPointTimeOne(newPointTimeOne);
-      setPointTimeTwo(newPointTimeTwo);
+      pointTimeOne.time = Math.max(Math.min(pointTimeOne.time, duration || Infinity), 0);
+      pointTimeNew.time = Math.max(Math.min(pointTimeNew.time, duration || Infinity), 0);
+      setPointTimeOne(pointTimeOne);
+      setPointTimeTwo(pointTimeNew);
+      e.target.pause();
     }
   }
 
@@ -186,11 +208,6 @@ function VideoContainer({ videoID, videoURL, videoFPS, dataObj }) {
     });
   }
 
-  function handleCancel() {
-    setPointTimeOne(false);
-    setPointTimeTwo(false);
-  }
-
   function handleSubmit(e) {
     const option = e.target.value;
 
@@ -201,11 +218,26 @@ function VideoContainer({ videoID, videoURL, videoFPS, dataObj }) {
 
     setPointTimeOne(false);
     setPointTimeTwo(false);
-    videoRef.current.play();
+  }
+
+  function deleteRectangle(rect) {
+    dataObj[videoID] = dataObj[videoID].filter((el) => (JSON.stringify(el) !== JSON.stringify(rect)));
+    setForceUpdate((x) => !x);
+  }
+
+  function seekFromBar(e) {
+    e.preventDefault();
+    const { left, right } = e.target.getBoundingClientRect();
+    const clientX = e.clientX - left;
+    const clientW = right - left;
+
+    if (duration) {
+      const t = (clientX / clientW) * duration;
+      setTime(t);
+    }
   }
 
   return (
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div id="video-container">
       <video
         id="main-video"
@@ -214,20 +246,186 @@ function VideoContainer({ videoID, videoURL, videoFPS, dataObj }) {
         ref={videoRef}
         onLoadedMetadata={handleReady}
         onTimeUpdate={timeUpdate}
+        onPause={pauseHandler}
+        onPlay={playHandler}
         onClick={onClickVideo}
       />
-      {dataObj[videoID].map(({ type, points: [p1, p2] }, i) => (
-        ((p1.time <= videoRef.current.currentTime) && (p2.time >= videoRef.current.currentTime))
-        && (
+      <div
+        id="progress-bar-outer"
+        style={videoWidth ? { width: videoWidth } : {}}
+        onClick={seekFromBar}
+      >
+        <div
+          id="progress-bar"
+          style={{ width: currTime && duration
+            ? `${(currTime / duration) * 100}%`
+            : '0%' }}
+        />
+        { dataObj[videoID].map(({ points: [p1, p2] }, i) => (
+          <>
+            <div
+              className="marker-container"
+              style={{ left: `${(Math.min(p1.time, p2.time) / duration) * 100}%` }}
+            >
+              <svg className="marker" viewBox="0 0 50 100" fill={`rgb(${colors[i % colors.length].join()})`}>
+                <polygon points="0,0 0,100 50,50" />
+              </svg>
+            </div>
+            <div
+              className="marker-container"
+              style={{ left: `${(Math.max(p1.time, p2.time) / duration) * 100}%`, transform: 'translate(-100%, 0%)' }}
+            >
+              <svg className="marker" viewBox="0 0 50 100" fill={`rgb(${colors[i % colors.length].join()})`}>
+                <polygon points="50,0 50,100 0,50" />
+              </svg>
+            </div>
+          </>
+        )) }
+        {
+          pointTimeOne && (
+            <div
+              className="marker-container"
+              style={{ left: `${(pointTimeOne.time / duration) * 100}%`, transform: 'translate(-50%, 0%)' }}
+            >
+              <svg
+                className="marker"
+                viewBox="0 0 50 100"
+                fill={`rgb(${colors[dataObj[videoID].length % colors.length].join()})`}
+              >
+                <polygon points="0,-50 0,100 50,100 50,-50" />
+              </svg>
+            </div>
+          )
+        }
+        {
+          pointTimeTwo && (
+            <div
+              className="marker-container"
+              style={{ left: `${(pointTimeTwo.time / duration) * 100}%`, transform: 'translate(-50%, 0%)' }}
+            >
+              <svg
+                className="marker"
+                viewBox="0 0 50 100"
+                fill={`rgb(${colors[dataObj[videoID].length % colors.length].join()})`}
+              >
+                <polygon points="0,-50 0,100 50,100 50,-50" />
+              </svg>
+            </div>
+          )
+        }
+      </div>
+      <div id="controls-container" style={videoWidth ? { width: videoWidth } : {}}>
+        <div
+          className="button-container"
+          style={{ height: '75%' }}
+          onClick={skipBack}
+        >
+          <svg className="button" viewBox="0 0 100 100">
+            <title>Skip backward half a second (Left arrow)</title>
+            <polygon points="90,20 90,80 45,50" />
+            <polygon points="55,20 55,80 10,50" />
+          </svg>
+        </div>
+
+        <div
+          className="button-container"
+          style={{ height: '75%' }}
+          onClick={frameBack}
+        >
+          <svg className="button" viewBox="0 0 100 100">
+            <title>Skip backward one frame (Comma)</title>
+            <polygon points="80,20 80,80 20,50" />
+            <polygon points="35,20 20,20 20,80 35,80" />
+          </svg>
+        </div>
+
+        <div
+          className="button-container"
+          style={{ height: '90%' }}
+          onClick={playPause}
+        >
+          <svg className="button" viewBox="0 0 100 100">
+            <title>Play/Pause (Spacebar)</title>
+            {isPaused
+              ? <polygon points="20,10 20,90 80,50" />
+              : (
+                <>
+                  <polygon points="20,10 40,10 40,90 20,90" />
+                  <polygon points="60,10 80,10 80,90 60,90" />
+                </>
+              )}
+          </svg>
+        </div>
+
+        <div
+          className="button-container"
+          style={{ height: '75%' }}
+          onClick={frameForward}
+        >
+          <svg className="button" viewBox="0 0 100 100">
+            <title>Skip forward one frame (Period)</title>
+            <polygon points="20,20 20,80 80,50" />
+            <polygon points="65,20 80,20 80,80 65,80" />
+          </svg>
+        </div>
+
+        <div
+          className="button-container"
+          style={{ height: '75%' }}
+          onClick={skipForward}
+        >
+          <svg className="button" viewBox="0 0 100 100">
+            <title>Skip forward half a second (Right arrow)</title>
+            <polygon points="10,20 10,80 55,50" />
+            <polygon points="45,20 45,80 90,50" />
+          </svg>
+        </div>
+      </div>
+      {dataObj[videoID].map((rect, i) => {
+        const { type, points: [p1, p2] } = rect;
+        if (!(((p1.time <= currTime) && (p2.time >= currTime))
+        || ((p2.time <= currTime) && (p1.time >= currTime)))) {
+          return null;
+        }
+        const rectStyle = getRectangleStyle(p1.x, p1.y, p2.x, p2.y, i);
+        return (
           <div
             key={i}
             className="rectangle"
-            style={getRectangleStyle(p1.x, p1.y, p2.x, p2.y, i)}
+            style={rectStyle}
           >
             <span className="rectText">{type}</span>
+            <div className="x-button-container">
+              <svg className="x-button" viewBox="0 0 100 100" onClick={() => deleteRectangle(rect)}>
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  stroke={rectStyle.outlineColor}
+                  fill={rectStyle.outlineColor}
+                  strokeWidth="10"
+                />
+                <line
+                  x1="20"
+                  y1="20"
+                  x2="80"
+                  y2="80"
+                  strokeWidth="10"
+                  stroke="black"
+                />
+                <line
+                  x1="20"
+                  y1="80"
+                  x2="80"
+                  y2="20"
+                  strokeWidth="10"
+                  stroke="black"
+                />
+              </svg>
+            </div>
           </div>
-        )
-      ))}
+        );
+      })}
       {pointTimeOne && pointTimeTwo && (
           <div
             key={dataObj[videoID].length}
@@ -258,34 +456,11 @@ function VideoContainer({ videoID, videoURL, videoFPS, dataObj }) {
             ))
           }
           <br />
-          <button className="btn" type="button" onClick={handleCancel}>
+          <button className="btn" type="button" onClick={cancel}>
             Cancel
           </button>
         </div>
       )}
-      <div id="frames-container-container">
-        <div className="frames-container">
-          {[-2, -1, 0, 1, 2].map((i) => (
-            <div className="frame-container" key={currFrameReduced + i}>
-              <video
-                className="frame"
-                src={`${videoURL}#t=${centerOfFrameReduced(currFrameReduced + i)}`}
-                preload={
-                  ((currFrameReduced + i) > lastFrameReduced) || ((currFrameReduced + i) < 0)
-                    ? 'none'
-                    : 'metadata'
-                }
-                poster={
-                  ((currFrameReduced + i) > lastFrameReduced) || ((currFrameReduced + i) < 0)
-                    ? 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=' // Pure black image
-                    : null
-                }
-                onClick={() => (incrFrameReduced(i))}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
