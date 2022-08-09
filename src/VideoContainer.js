@@ -262,7 +262,7 @@ function VideoContainer({ videoID, videoURL, videoFPS, dataObj }) {
             : '0%' }}
         />
         { dataObj[videoID].map(({ points: [p1, p2] }, i) => (
-          <>
+          <React.Fragment key={i}>
             <div
               className="marker-container"
               style={{ left: `${(Math.min(p1.time, p2.time) / duration) * 100}%` }}
@@ -279,7 +279,7 @@ function VideoContainer({ videoID, videoURL, videoFPS, dataObj }) {
                 <polygon points="50,0 50,100 0,50" />
               </svg>
             </div>
-          </>
+          </React.Fragment>
         )) }
         {
           pointTimeOne && (

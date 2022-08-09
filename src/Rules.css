@@ -1,0 +1,19 @@
+div#rules {
+  position: relative;
+  padding: 25px;
+  box-sizing: border-box;
+}
+
+div.text {
+  max-width: 50vw;
+}
+
+video.rule-vid {
+  object-fit: contain;
+  width: 50vw;
+}
+
+img.rule-img {
+  object-fit: contain;
+  width: 50vw;
+}
